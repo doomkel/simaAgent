@@ -1,8 +1,7 @@
 import type { Plugin, ViteDevServer } from "vite";
 
 const REQUIRED_VARS = [
-  "VITE_ENTRA_SPA_CLIENT_ID",
-  "VITE_ENTRA_TENANT_ID",
+  "VITE_GOOGLE_CLIENT_ID",
 ] as const;
 
 const ERROR_HTML = `<!DOCTYPE html>
@@ -28,21 +27,17 @@ const ERROR_HTML = `<!DOCTYPE html>
 <body>
   <div class="card">
     <h1>⚠️ Setup Required</h1>
-    <p class="subtitle">Missing environment variables needed for Entra ID authentication.</p>
+    <p class="subtitle">Missing environment variables needed for Google OAuth authentication.</p>
 
     <p>The following variables are <span class="missing">not set</span>:</p>
     <pre>MISSING_VARS_PLACEHOLDER</pre>
 
     <h2>How to fix</h2>
     <ol>
-      <li>Run <code>azd up</code> from the repo root — this creates the Entra app registration and generates the required <code>.env</code> files automatically.</li>
-      <li>Restart the dev server after <code>azd up</code> completes.</li>
+      <li>Create an OAuth 2.0 Client ID (Web application) in <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console</a>, adding this app's origin as an authorized JavaScript origin.</li>
+      <li>Set <code>VITE_GOOGLE_CLIENT_ID</code> in <code>frontend/.env.local</code> to that client ID.</li>
+      <li>Restart the dev server.</li>
     </ol>
-
-    <h2>Coming from the AI Foundry portal?</h2>
-    <p>The portal's "View sample app code" gives you AI resource variables, but this app also needs an <strong>Entra ID app registration</strong> for authentication. Running <code>azd up</code> creates it for you — even if your AI Foundry resources already exist.</p>
-
-    <pre>azd up</pre>
 
     <div class="help">
       📖 See the <a href="https://github.com/microsoft-foundry/foundry-agent-webapp#quick-start">README</a> for full setup instructions.
@@ -71,17 +66,8 @@ export function envCheckPlugin(): Plugin {
         console.warn(
           `  Missing environment variables:\n${missing.map((v) => `    • ${v}`).join("\n")}\n`
         );
-        console.warn(`  Run \x1b[36mazd up\x1b[0m from the repo root to create the`);
-        console.warn(`  Entra app registration and generate .env files.\n`);
-        console.warn(
-          `  Coming from the AI Foundry portal? You still need to`
-        );
-        console.warn(
-          `  run \x1b[36mazd up\x1b[0m — the portal gives AI resource vars, but`
-        );
-        console.warn(
-          `  this app also requires an Entra ID app for authentication.\n`
-        );
+        console.warn(`  Set VITE_GOOGLE_CLIENT_ID in frontend/.env.local — see`);
+        console.warn(`  https://console.cloud.google.com/apis/credentials for the OAuth Client ID.\n`);
         console.warn(`\x1b[31m${border}\x1b[0m\n`);
       }
     },

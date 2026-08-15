@@ -303,7 +303,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = (props) => {
           onNewChat={onNewChat}
           onToggleSidebar={onToggleSidebar}
           hasMessages={hasMessages}
-          placeholder="Type your message here..."
+          placeholder="Escribe tu mensaje aquí..."
           isStreaming={isStreaming}
           onCancelStream={isStreaming && onCancelStream ? onCancelStream : undefined}
           isEditing={isEditing}

@@ -1,6 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 import type { ReactNode, Dispatch } from 'react';
-import { useMsal } from '@azure/msal-react';
 import type { AppState, AppAction } from '../types/appState';
 import { initialAppState } from '../types/appState';
 import { appReducer } from '../reducers/appReducer';
@@ -70,14 +69,6 @@ const reducerWithLogging = (state: AppState, action: AppAction): AppState => {
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducerWithLogging, initialAppState);
-  const { accounts } = useMsal();
-
-  // Initialize auth state from MSAL
-  useEffect(() => {
-    if (accounts.length > 0) {
-      dispatch({ type: 'AUTH_INITIALIZED', user: accounts[0] });
-    }
-  }, [accounts]);
 
   // Dev mode: Log when provider mounts and unmounts
   useEffect(() => {

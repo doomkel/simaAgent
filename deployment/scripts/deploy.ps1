@@ -8,7 +8,7 @@
     
     azd deploy handles:
     1. Building the Docker image (locally or via ACR remote build)
-    2. Passing build args (ENTRA_SPA_CLIENT_ID, ENTRA_TENANT_ID) from azd environment
+    2. Passing build args (GOOGLE_CLIENT_ID, GOOGLE_HOSTED_DOMAIN) from azd environment
     3. Pushing to Azure Container Registry
     4. Updating the Container App with the new image
     

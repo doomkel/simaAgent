@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, "");
   
   // Map to VITE_ prefixed vars for client access (Vite only exposes VITE_ prefixed vars)
-  process.env.VITE_ENTRA_SPA_CLIENT_ID = env.ENTRA_SPA_CLIENT_ID || env.VITE_ENTRA_SPA_CLIENT_ID;
-  process.env.VITE_ENTRA_TENANT_ID = env.ENTRA_TENANT_ID || env.VITE_ENTRA_TENANT_ID;
+  process.env.VITE_GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID || env.VITE_GOOGLE_CLIENT_ID;
+  process.env.VITE_GOOGLE_HOSTED_DOMAIN = env.GOOGLE_HOSTED_DOMAIN || env.VITE_GOOGLE_HOSTED_DOMAIN;
 
   return {
     plugins: [react(), envCheckPlugin()],

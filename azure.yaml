@@ -20,7 +20,7 @@ hooks:
       run: ./deployment/hooks/predeploy.ps1
       continueOnError: false
 
-  # Phase 1: Create Entra app, generate config files
+  # Phase 1: Validate GOOGLE_CLIENT_ID, generate config files
   preprovision:
     windows:
       shell: pwsh
@@ -33,7 +33,7 @@ hooks:
 
   # Phase 2: Provision (automatic - Bicep templates with placeholder image)
   
-  # Phase 3: Update Entra redirect URIs + assign RBAC to AI Foundry
+  # Phase 3: Assign RBAC to AI Foundry + generate local dev config
   postprovision:
     windows:
       shell: pwsh
@@ -44,7 +44,7 @@ hooks:
       run: ./deployment/hooks/postprovision.ps1
       continueOnError: false
 
-  # Cleanup Entra app and config files
+  # Cleanup role assignments and config files
   postdown:
     windows:
       shell: pwsh

@@ -51,7 +51,7 @@ async function run() {
       await page.waitForSelector('[role="log"]', { timeout: TIMEOUT });
       log('Auth + page load', true);
     } catch {
-      log('Auth + page load', false, 'Page did not load within timeout — may need interactive MSAL login');
+      log('Auth + page load', false, 'Page did not load within timeout — may need interactive Google sign-in');
     }
 
     // 3. Agent metadata

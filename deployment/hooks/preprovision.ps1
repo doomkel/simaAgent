@@ -1,6 +1,7 @@
 #!/usr/bin/env pwsh
 # Pre-provision: Discovers AI Foundry resources and configures agent
-# Entra app registration is handled declaratively by Bicep (infra/entra-app.bicep)
+# Google OAuth Client ID must be set by the user (azd env set GOOGLE_CLIENT_ID <id>) —
+# it can't be auto-created since it belongs to a Google Cloud project, not Azure.
 
 $ErrorActionPreference = "Stop"
 $env:PYTHONIOENCODING = "utf-8"
@@ -32,15 +33,17 @@ if ([string]::IsNullOrWhiteSpace($envName)) {
     exit 1
 }
 
-# Auto-detect tenant if not set
-$tenantId = (azd env get-value ENTRA_TENANT_ID 2>&1) | Where-Object { $_ -notmatch 'ERROR' } | Select-Object -First 1
-if ([string]::IsNullOrWhiteSpace($tenantId)) {
-    $tenantId = $account.tenantId
-    azd env set ENTRA_TENANT_ID $tenantId
-}
-Write-Host "[OK] Tenant: $tenantId" -ForegroundColor Green
-
 Write-Host "[OK] Environment: $envName" -ForegroundColor Green
+
+# Google OAuth Client ID must be set by the user before provisioning
+$googleClientId = (azd env get-value GOOGLE_CLIENT_ID 2>&1) | Where-Object { $_ -notmatch 'ERROR' } | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($googleClientId)) {
+    Write-Host "[ERROR] GOOGLE_CLIENT_ID not set." -ForegroundColor Red
+    Write-Host "  Create an OAuth 2.0 Client ID (Web application) at https://console.cloud.google.com/apis/credentials" -ForegroundColor Yellow
+    Write-Host "  Then run: azd env set GOOGLE_CLIENT_ID <client-id>" -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "[OK] Google Client ID: $googleClientId" -ForegroundColor Green
 
 # Map portal variables (AZURE_EXISTING_*) to app variables if present
 # The AI Foundry portal's "View sample app code" emits these when linking to this repo.

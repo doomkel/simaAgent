@@ -9,13 +9,12 @@ deployment/
 ├── docker/              # Docker build files
 │   └── frontend.Dockerfile  # Single-container build (React + ASP.NET Core)
 ├── hooks/               # Azure Developer CLI lifecycle hooks
-│   ├── preprovision.ps1     # Create Entra app + discover AI Foundry + generate config
-│   ├── postprovision.ps1    # Update Entra redirect URIs + assign RBAC
+│   ├── preprovision.ps1     # Validate GOOGLE_CLIENT_ID + discover AI Foundry + generate config
+│   ├── postprovision.ps1    # Assign RBAC + generate local dev config
 │   ├── predeploy.ps1        # Build container (local Docker or ACR cloud build)
 │   ├── postdown.ps1         # Cleanup (optional)
 │   └── modules/             # Reusable PowerShell modules
-│       ├── Get-AIFoundryAgents.ps1
-│       └── New-EntraAppRegistration.ps1
+│       └── Get-AIFoundryAgents.ps1
 └── scripts/             # User-invoked scripts
     └── start-local-dev.ps1  # Start native local development
 ```
@@ -43,9 +42,9 @@ This is handled automatically by `predeploy.ps1`.
 
 ```
 azd up
-  ├─ preprovision.ps1 (Entra + AI Foundry discovery + .env generation)
+  ├─ preprovision.ps1 (AI Foundry discovery + .env generation; requires GOOGLE_CLIENT_ID)
   ├─ provision (Bicep deployment with placeholder image)
-  ├─ postprovision.ps1 (updates Entra redirect URIs + RBAC)
+  ├─ postprovision.ps1 (RBAC + local dev config)
   └─ predeploy.ps1 (builds container - local Docker or ACR cloud)
 
 azd deploy

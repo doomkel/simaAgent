@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
 using WebApp.Api.Models;
 using WebApp.Api.Services;
-using System.Security.Claims;
 
 // Load .env file for local development BEFORE building the configuration
 // In production (Docker), Container Apps injects environment variables directly
@@ -73,59 +71,42 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Override ClientId and TenantId from environment variables if provided
-// These will be set by azd during deployment or by AppHost in local dev
-var clientId = builder.Configuration["ENTRA_SPA_CLIENT_ID"]
-    ?? builder.Configuration["AzureAd:ClientId"];
+// Google OAuth Client ID and allowed Workspace domain (set via env vars)
+var googleClientId = builder.Configuration["GOOGLE_CLIENT_ID"]
+    ?? throw new InvalidOperationException("GOOGLE_CLIENT_ID is not configured");
 
-if (!string.IsNullOrEmpty(clientId))
-{
-    builder.Configuration["AzureAd:ClientId"] = clientId;
-    // Set audience to match the expected token audience claim
-    builder.Configuration["AzureAd:Audience"] = $"api://{clientId}";
-}
+var allowedGoogleDomain = builder.Configuration["GOOGLE_HOSTED_DOMAIN"] ?? "3styk.com";
 
-var tenantId = builder.Configuration["ENTRA_TENANT_ID"]
-    ?? builder.Configuration["AzureAd:TenantId"];
+const string ScopePolicyName = "RequireGoogleWorkspaceDomain";
 
-if (!string.IsNullOrEmpty(tenantId))
-{
-    builder.Configuration["AzureAd:TenantId"] = tenantId;
-}
-
-const string RequiredScope = "Chat.ReadWrite";
-const string ScopePolicyName = "RequireChatScope";
-
-// Add Microsoft Identity Web authentication
-// Validates JWT bearer tokens issued for the SPA's delegated scope
+// Validate Google-issued ID tokens: signature via OIDC discovery (JWKS), audience, and Workspace domain.
+// No client secret needed — Google Identity Services returns a signed ID token directly to the SPA.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(options =>
+    .AddJwtBearer(options =>
     {
-        builder.Configuration.Bind("AzureAd", options);
-        var configuredClientId = builder.Configuration["AzureAd:ClientId"];
-        var backendClientId = builder.Configuration["ENTRA_BACKEND_CLIENT_ID"];
+        options.Authority = "https://accounts.google.com";
+        options.TokenValidationParameters.ValidAudiences = new[] { googleClientId };
+        options.TokenValidationParameters.ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" };
+        options.TokenValidationParameters.NameClaimType = "email";
 
-        // When OBO is enabled, tokens are scoped to the backend API app
-        var audiences = new List<string> { configuredClientId!, $"api://{configuredClientId}" };
-        if (!string.IsNullOrEmpty(backendClientId))
+        options.Events = new JwtBearerEvents
         {
-            audiences.Add(backendClientId);
-            audiences.Add($"api://{backendClientId}");
-        }
-        options.TokenValidationParameters.ValidAudiences = audiences;
-
-        options.TokenValidationParameters.NameClaimType = ClaimTypes.Name;
-        options.TokenValidationParameters.RoleClaimType = ClaimTypes.Role;
-    }, options => builder.Configuration.Bind("AzureAd", options));
+            // Google's "hd" claim identifies the Workspace domain the account belongs to.
+            OnTokenValidated = context =>
+            {
+                var hostedDomain = context.Principal?.FindFirst("hd")?.Value;
+                if (!string.Equals(hostedDomain, allowedGoogleDomain, StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Fail($"Account domain '{hostedDomain}' is not authorized for this application.");
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 builder.Services.AddAuthorization(options =>
 {
-    // Use Microsoft.Identity.Web's built-in scope validation
-    options.AddPolicy(ScopePolicyName, policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireScope(RequiredScope);
-    });
+    options.AddPolicy(ScopePolicyName, policy => policy.RequireAuthenticatedUser());
 });
 
 // Register Foundry Agent Service (v2 Agents API)
@@ -417,7 +398,6 @@ app.MapGet("/api/conversations", async (
 {
     // MI mode: conversations are agent-scoped, not user-scoped.
     // All authenticated users see all conversations for this agent.
-    // This is by-design — OBO mode (ENTRA_BACKEND_CLIENT_ID set) scopes per-user.
     try
     {
         var pageSize = Math.Clamp(limit ?? 20, 1, 100);

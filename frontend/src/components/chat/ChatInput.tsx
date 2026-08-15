@@ -70,7 +70,7 @@ const focusInput = (containerRef: React.RefObject<HTMLDivElement | null>) => {
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSubmit,
   disabled = false,
-  placeholder = "Type your message...",
+  placeholder = "Escribe tu mensaje...",
   onOpenSettings,
   onNewChat,
   onToggleSidebar,

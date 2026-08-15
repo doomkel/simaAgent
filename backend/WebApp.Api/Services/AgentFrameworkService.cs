@@ -5,8 +5,6 @@ using Azure.Core;
 using Azure.Identity;
 using OpenAI.Files;
 using OpenAI.Responses;
-using Microsoft.Identity.Client;
-using Microsoft.Identity.Web;
 using System.Runtime.CompilerServices;
 using WebApp.Api.Models;
 
@@ -37,18 +35,13 @@ public class AgentFrameworkService : IDisposable
     private readonly string? _configuredAgentVersion;
     private readonly ILogger<AgentFrameworkService> _logger;
     private readonly IHttpContextAccessor? _httpContextAccessor;
-    private readonly string? _backendClientId;
-    private readonly string? _tenantId;
     private readonly string? _managedIdentityClientId;
-    private readonly bool _useObo;
     private readonly TokenCredential _fallbackCredential;
 
     // Agent metadata cache (static - shared across requests)
     private static ProjectsAgentVersion? s_cachedAgentVersion;
     private static AgentMetadataResponse? s_cachedMetadata;
     private static readonly SemaphoreSlim s_agentLock = new(1, 1);
-    // MI assertion cache (static - user-independent, safe to share across requests)
-    private static ManagedIdentityClientAssertion? s_miAssertion;
 
     private readonly IHttpClientFactory _httpClientFactory;
 
@@ -79,9 +72,11 @@ public class AgentFrameworkService : IDisposable
         _agentId = configuration["AI_AGENT_ID"]
             ?? throw new InvalidOperationException("AI_AGENT_ID is not configured");
 
-        _configuredAgentVersion = string.IsNullOrWhiteSpace(configuration["AI_AGENT_VERSION"])
-            ? null
-            : configuration["AI_AGENT_VERSION"];
+        var rawVersion = configuration["AI_AGENT_VERSION"];
+        // Ignorar el mensaje de error de azd si la variable no está configurada
+        _configuredAgentVersion = string.IsNullOrWhiteSpace(rawVersion) || rawVersion.StartsWith("ERROR:")
+        ? null
+        : rawVersion;
 
         _logger.LogDebug(
             "Initializing AgentFrameworkService: endpoint={Endpoint}, agentId={AgentId}, version={Version}", 
@@ -89,20 +84,12 @@ public class AgentFrameworkService : IDisposable
             _agentId,
             _configuredAgentVersion ?? "<latest>");
 
-        _backendClientId = configuration["ENTRA_BACKEND_CLIENT_ID"];
-        _tenantId = configuration["ENTRA_TENANT_ID"] ?? configuration["AzureAd:TenantId"];
-        // User-assigned MI client ID — used for MI-only mode and as FIC assertion in OBO mode
-        _managedIdentityClientId = configuration["MANAGED_IDENTITY_CLIENT_ID"]
-            ?? configuration["OBO_MANAGED_IDENTITY_CLIENT_ID"]; // backward compat
+        // User-assigned managed identity client ID (optional; falls back to system-assigned MI)
+        _managedIdentityClientId = configuration["MANAGED_IDENTITY_CLIENT_ID"];
 
         var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
 
-        // Determine if OBO is available
-        _useObo = !string.IsNullOrEmpty(_backendClientId)
-                  && !string.IsNullOrEmpty(_tenantId)
-                  && environment != "Development";
-
-        // Create credential for non-OBO operations (agent metadata cache, MI-only mode)
+        // Create credential used for all Foundry API calls (agent-scoped, not user-delegated)
         if (environment == "Development")
         {
             _logger.LogInformation("Development: Using ChainedTokenCredential (AzureCli -> AzureDeveloperCli)");
@@ -122,90 +109,18 @@ public class AgentFrameworkService : IDisposable
             _fallbackCredential = new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
         }
 
-        if (_useObo)
-        {
-            if (string.IsNullOrEmpty(_managedIdentityClientId))
-            {
-                throw new InvalidOperationException(
-                    "OBO mode requires MANAGED_IDENTITY_CLIENT_ID to be set for the FIC assertion. " +
-                    "This is the user-assigned managed identity that acts as the federated credential.");
-            }
-            _logger.LogInformation("OBO mode enabled: backendClientId={BackendClientId}. All API calls use user-delegated identity.", _backendClientId);
-
-            // Initialize MI assertion eagerly — avoids thread-safety issues with lazy init
-            // in CreateOboCredential(). Safe here because the constructor runs once per scoped instance.
-            s_miAssertion ??= new ManagedIdentityClientAssertion(managedIdentityClientId: _managedIdentityClientId);
-
-            // No cached project client in OBO mode — created per-request with user's token
-        }
-        else
-        {
-            _logger.LogInformation("MI mode: using managed identity for all API calls");
-            _projectClient = new AIProjectClient(new Uri(_agentEndpoint), _fallbackCredential);
-        }
+        _projectClient = new AIProjectClient(new Uri(_agentEndpoint), _fallbackCredential);
 
         _logger.LogInformation("AIProjectClient initialized successfully");
     }
 
     /// <summary>
-    /// Get AIProjectClient — OBO mode creates per-request with user's identity, MI mode uses cached client.
+    /// Get the cached AIProjectClient, backed by the managed identity credential.
     /// </summary>
     private AIProjectClient GetProjectClient()
     {
-        // MI mode: return cached client
-        if (!_useObo)
-        {
-            _projectClient ??= new AIProjectClient(new Uri(_agentEndpoint), _fallbackCredential);
-            return _projectClient;
-        }
-
-        // OBO: create per-request client with user's token (cached for request lifetime)
-        if (_projectClient is null)
-        {
-            var userToken = ExtractBearerToken();
-            if (string.IsNullOrEmpty(userToken))
-            {
-                throw new InvalidOperationException(
-                    "OBO mode requires a bearer token but none was found in the request. " +
-                    "Ensure the frontend is sending an Authorization header with a valid token.");
-            }
-
-            var oboCredential = CreateOboCredential(userToken);
-            _logger.LogDebug("Created OBO credential for request");
-            _projectClient = new AIProjectClient(new Uri(_agentEndpoint), oboCredential);
-        }
-
+        _projectClient ??= new AIProjectClient(new Uri(_agentEndpoint), _fallbackCredential);
         return _projectClient;
-    }
-
-    /// <summary>
-    /// Create OBO credential using the user's JWT and managed identity FIC assertion.
-    /// </summary>
-    private OnBehalfOfCredential CreateOboCredential(string userToken)
-    {
-        // s_miAssertion is initialized eagerly in the constructor (OBO branch)
-        Func<CancellationToken, Task<string>> assertionCallback =
-            async (ct) => await s_miAssertion!.GetSignedAssertionAsync(
-                new AssertionRequestOptions { CancellationToken = ct });
-
-        return new OnBehalfOfCredential(
-            _tenantId!,
-            _backendClientId!,
-            assertionCallback,
-            userToken,
-            new OnBehalfOfCredentialOptions());
-    }
-
-    /// <summary>
-    /// Extract bearer token from the current HTTP request.
-    /// </summary>
-    private string? ExtractBearerToken()
-    {
-        var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers.Authorization.ToString();
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        return authHeader["Bearer ".Length..].Trim();
     }
 
     /// <summary>
@@ -999,20 +914,8 @@ public class AgentFrameworkService : IDisposable
     {
         _logger.LogInformation("Downloading container file: {FileId} from container: {ContainerId}", fileId, containerId);
 
-        // Reuse the same credential as the project client (MI or OBO)
-        TokenCredential credential;
-        if (_useObo)
-        {
-            var userToken = ExtractBearerToken();
-            credential = CreateOboCredential(userToken ?? throw new InvalidOperationException("OBO requires bearer token"));
-        }
-        else
-        {
-            credential = _fallbackCredential;
-        }
-
         var tokenRequestContext = new TokenRequestContext(["https://ai.azure.com/.default"]);
-        var accessToken = await credential.GetTokenAsync(tokenRequestContext, cancellationToken);
+        var accessToken = await _fallbackCredential.GetTokenAsync(tokenRequestContext, cancellationToken);
 
         var requestUrl = $"{_agentEndpoint.TrimEnd('/')}/openai/v1/containers/{Uri.EscapeDataString(containerId)}/files/{Uri.EscapeDataString(fileId)}/content";
         using var httpClient = _httpClientFactory.CreateClient();

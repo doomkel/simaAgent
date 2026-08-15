@@ -5,12 +5,11 @@ param containerAppsEnvironmentId string
 param containerRegistryName string
 param aiAgentEndpoint string
 param aiAgentId string
-param entraSpaClientId string
-param entraTenantId string
-param entraBackendClientId string = ''
+param googleClientId string
+param googleHostedDomain string
 param webImageName string
 param userAssignedIdentityId string = ''
-param oboManagedIdentityClientId string = ''
+param managedIdentityClientId string = ''
 param appInsightsConnectionString string = ''
 param appInsightsFrontendConnectionString string = ''
 
@@ -27,12 +26,12 @@ var baseEnv = [
     value: 'http://+:8080'
   }
   {
-    name: 'ENTRA_SPA_CLIENT_ID'
-    value: entraSpaClientId
+    name: 'GOOGLE_CLIENT_ID'
+    value: googleClientId
   }
   {
-    name: 'ENTRA_TENANT_ID'
-    value: entraTenantId
+    name: 'GOOGLE_HOSTED_DOMAIN'
+    value: googleHostedDomain
   }
   {
     name: 'AI_AGENT_ENDPOINT'
@@ -56,19 +55,11 @@ var baseEnv = [
 var miEnv = [
   {
     name: 'MANAGED_IDENTITY_CLIENT_ID'
-    value: oboManagedIdentityClientId
+    value: managedIdentityClientId
   }
 ]
 
-// OBO env vars only injected when configured
-var oboEnv = !empty(entraBackendClientId) ? [
-  {
-    name: 'ENTRA_BACKEND_CLIENT_ID'
-    value: entraBackendClientId
-  }
-] : []
-
-var containerEnv = concat(baseEnv, miEnv, oboEnv)
+var containerEnv = concat(baseEnv, miEnv)
 
 // Single Container App - serves both frontend and backend
 module webApp './core/host/container-app.bicep' = {

@@ -58,11 +58,10 @@ export class ChatService {
   }
 
   /**
-   * Acquire authentication token using MSAL.
-   * Attempts silent acquisition first, falls back to popup if needed.
-   * 
+   * Acquire the current authentication token.
+   *
    * @returns Access token string
-   * @throws {Error} If token acquisition fails
+   * @throws {Error} If no token is available (user not signed in)
    */
   private async ensureAuthToken(): Promise<string> {
     const token = await this.getAccessToken();

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { appReducer } from '../appReducer';
 import { initialAppState } from '../../types/appState';
-import type { AppState, AppAction, IChatItem, IAnnotation } from '../../types/appState';
-import type { AccountInfo } from '@azure/msal-browser';
+import type { AppState, AppAction, IChatItem, IAnnotation, GoogleUser } from '../../types/appState';
 
 // Initial state factory for clean test isolation
 function createInitialState(): AppState {
@@ -10,6 +9,7 @@ function createInitialState(): AppState {
     auth: {
       status: 'unauthenticated',
       user: null,
+      token: null,
       error: null,
     },
     chat: {
@@ -47,14 +47,11 @@ function createMockMessage(overrides: Partial<IChatItem> = {}): IChatItem {
   };
 }
 
-// Mock AccountInfo factory
-function createMockUser(overrides: Partial<AccountInfo> = {}): AccountInfo {
+// Mock GoogleUser factory
+function createMockUser(overrides: Partial<GoogleUser> = {}): GoogleUser {
   return {
-    homeAccountId: 'home-account-1',
-    environment: 'login.microsoftonline.com',
-    tenantId: 'tenant-1',
-    username: 'test@example.com',
-    localAccountId: 'local-1',
+    sub: 'google-sub-1',
+    email: 'test@3styk.com',
     name: 'Test User',
     ...overrides,
   };
@@ -65,12 +62,13 @@ describe('appReducer', () => {
     it('sets status to authenticated with user', () => {
       const state = createInitialState();
       const user = createMockUser();
-      const action: AppAction = { type: 'AUTH_INITIALIZED', user };
+      const action: AppAction = { type: 'AUTH_INITIALIZED', user, token: 'test-id-token' };
 
       const result = appReducer(state, action);
 
       expect(result.auth.status).toBe('authenticated');
       expect(result.auth.user).toEqual(user);
+      expect(result.auth.token).toBe('test-id-token');
       expect(result.auth.error).toBeNull();
     });
   });
@@ -1464,6 +1462,7 @@ describe('appReducer', () => {
           "auth",
           "auth.error",
           "auth.status",
+          "auth.token",
           "auth.user",
           "chat",
           "chat.currentConversationId",

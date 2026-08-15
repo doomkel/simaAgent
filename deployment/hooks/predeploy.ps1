@@ -15,9 +15,9 @@ function Get-AzdValue($name) {
     return $val
 }
 
-$clientId = Get-AzdValue 'ENTRA_SPA_CLIENT_ID'
-$tenantId = Get-AzdValue 'ENTRA_TENANT_ID'
-$backendClientId = Get-AzdValue 'ENTRA_BACKEND_CLIENT_ID'
+$googleClientId = Get-AzdValue 'GOOGLE_CLIENT_ID'
+$googleHostedDomain = Get-AzdValue 'GOOGLE_HOSTED_DOMAIN'
+if (-not $googleHostedDomain) { $googleHostedDomain = '3styk.com' }
 $appInsightsConnStr = Get-AzdValue 'APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING'
 # Escape semicolons for ACR cloud builds — unescaped semicolons are interpreted as shell command separators
 if ($appInsightsConnStr) { $appInsightsConnStrEscaped = $appInsightsConnStr -replace ';', '\;' } else { $appInsightsConnStrEscaped = '' }
@@ -25,8 +25,8 @@ $acrName = Get-AzdValue 'AZURE_CONTAINER_REGISTRY_NAME'
 $resourceGroup = Get-AzdValue 'AZURE_RESOURCE_GROUP_NAME'
 $containerApp = Get-AzdValue 'AZURE_CONTAINER_APP_NAME'
 
-if (-not $clientId -or -not $tenantId) {
-    Write-Host "[ERROR] ENTRA_SPA_CLIENT_ID or ENTRA_TENANT_ID not set" -ForegroundColor Red
+if (-not $googleClientId) {
+    Write-Host "[ERROR] GOOGLE_CLIENT_ID not set" -ForegroundColor Red
     exit 1
 }
 if (-not $acrName) {
@@ -55,10 +55,9 @@ try {
         Write-Host "Building with local Docker..." -ForegroundColor Cyan
         $buildArgs = @(
             "--platform", "linux/amd64",
-            "--build-arg", "ENTRA_SPA_CLIENT_ID=$clientId",
-            "--build-arg", "ENTRA_TENANT_ID=$tenantId"
+            "--build-arg", "GOOGLE_CLIENT_ID=$googleClientId",
+            "--build-arg", "GOOGLE_HOSTED_DOMAIN=$googleHostedDomain"
         )
-        if ($backendClientId) { $buildArgs += @("--build-arg", "ENTRA_BACKEND_CLIENT_ID=$backendClientId") }
         if ($appInsightsConnStr) { $buildArgs += @("--build-arg", "APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING=$appInsightsConnStr") }
         $buildArgs += @("-f", "deployment/docker/frontend.Dockerfile", "-t", $imageName, ".")
         docker build @buildArgs 2>&1 | Out-Host
@@ -70,8 +69,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Docker push failed" }
     } else {
         Write-Host "Using ACR cloud build (3-5 min)..." -ForegroundColor Yellow
-        $acrBuildArgs = @("--build-arg", "ENTRA_SPA_CLIENT_ID=$clientId", "--build-arg", "ENTRA_TENANT_ID=$tenantId")
-        if ($backendClientId) { $acrBuildArgs += @("--build-arg", "ENTRA_BACKEND_CLIENT_ID=$backendClientId") }
+        $acrBuildArgs = @("--build-arg", "GOOGLE_CLIENT_ID=$googleClientId", "--build-arg", "GOOGLE_HOSTED_DOMAIN=$googleHostedDomain")
         if ($appInsightsConnStrEscaped) { $acrBuildArgs += @("--build-arg", "APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING=$appInsightsConnStrEscaped") }
         $buildOutput = az acr build --registry $acrName --image "web:$imageTag" `
             @acrBuildArgs `

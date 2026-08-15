@@ -1,9 +1,16 @@
-import type { AccountInfo } from '@azure/msal-browser';
 import type { IChatItem, IUsageInfo, IAnnotation, IMcpApprovalRequest, IFileAttachment } from './chat';
 import type { AppError } from './errors';
 
 // Re-export types for convenience
 export type { IChatItem, IUsageInfo, IAnnotation, IMcpApprovalRequest, IFileAttachment };
+
+/** Authenticated user derived from a verified Google ID token. */
+export interface GoogleUser {
+  sub: string;
+  email: string;
+  name: string;
+  picture?: string;
+}
 
 export interface ConversationSummary {
   id: string;
@@ -24,7 +31,8 @@ export interface AppState {
   // Authentication state
   auth: {
     status: 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
-    user: AccountInfo | null;
+    user: GoogleUser | null;
+    token: string | null;
     error: string | null;
   };
   
@@ -62,8 +70,9 @@ export interface AppState {
  */
 export type AppAction = 
   // Auth actions
-  | { type: 'AUTH_INITIALIZED'; user: AccountInfo }
+  | { type: 'AUTH_INITIALIZED'; user: GoogleUser; token: string }
   | { type: 'AUTH_TOKEN_EXPIRED' }
+  | { type: 'AUTH_SIGN_OUT' }
   
   // Chat actions
   | { type: 'CHAT_SEND_MESSAGE'; message: IChatItem }
@@ -106,6 +115,7 @@ export const initialAppState: AppState = {
   auth: {
     status: 'initializing',
     user: null,
+    token: null,
     error: null,
   },
   chat: {

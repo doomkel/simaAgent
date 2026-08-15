@@ -12,10 +12,10 @@ Infrastructure as Code (IaC) using Azure Bicep, deployed via Azure Developer CLI
 - **Log Analytics Workspace** - Centralized logging (30-day retention)
 - **Application Insights (Backend)** - OpenTelemetry traces and metrics (`appi-<token>`)
 - **Application Insights (Frontend)** - Browser telemetry (`appi-fe-<token>`, separate resource to isolate browser metrics)
-- **User-Assigned Managed Identity** - Regional isolation, used for ACR pull + AI Foundry RBAC + OBO FIC
-- **Entra SPA App Registration** - Microsoft Graph Bicep extension (`Microsoft.Graph/applications@v1.0`)
-- **Entra Backend App** (opt-in, `enableObo=true`) - OBO with FIC, `requiredResourceAccess`, admin consent via `oauth2PermissionGrants`
+- **User-Assigned Managed Identity** - Regional isolation, used for ACR pull + AI Foundry RBAC
 - **RBAC Assignments** - MI → AI Foundry access (via Azure CLI, not Bicep); MI → ACR pull (via Bicep)
+
+Authentication uses Google OAuth 2.0 (Google Identity Services on the frontend, ID token validation on the backend) — no Entra app registration is provisioned. See `GOOGLE_CLIENT_ID` in the Parameters section below.
 
 ## Architecture
 
@@ -23,15 +23,7 @@ Infrastructure as Code (IaC) using Azure Bicep, deployed via Azure Developer CLI
 Subscription (deployment scope)
 ├── Resource Group (auto-created)
 ├── User-Assigned Managed Identity (isolationScope: Regional)
-│   └── Used for: ACR pull, AI Foundry RBAC, OBO FIC
-├── Entra SPA App Registration (Microsoft Graph Bicep)
-│   ├── SPA redirect URIs (localhost; FQDN added by postprovision)
-│   └── Chat.ReadWrite scope
-├── Entra Backend App (conditional: enableObo=true)
-│   ├── FIC → user-assigned MI (secretless OBO)
-│   ├── requiredResourceAccess → Azure Machine Learning Services
-│   ├── oauth2PermissionGrants → admin consent
-│   └── knownClientApplications → SPA app
+│   └── Used for: ACR pull, AI Foundry RBAC
 ├── Container Registry (ACR, adminUserEnabled: false)
 │   └── AcrPull role → user-assigned MI
 ├── Application Insights (Backend: appi-xxx)
@@ -42,6 +34,7 @@ Subscription (deployment scope)
 │   └── Container App (web)
 │       ├── User-assigned identity only
 │       ├── ACR pull via MI (no admin credentials)
+│       ├── GOOGLE_CLIENT_ID / GOOGLE_HOSTED_DOMAIN env vars (backend token validation)
 │       ├── Scale: 0-3 replicas
 │       └── Ingress: HTTPS external
 └── Log Analytics Workspace (shared by both App Insights resources)
@@ -57,18 +50,17 @@ RBAC (via Azure CLI in postprovision.ps1):
 | `main.bicep` | Orchestration (subscription scope) |
 | `main-infrastructure.bicep` | Shared resources (ACR, Log Analytics, Application Insights, Container Apps Env) |
 | `main-app.bicep` | Container App configuration |
-| `entra-app.bicep` | Entra app registration (Microsoft Graph Bicep extension) |
-| `bicepconfig.json` | Bicep configuration (Microsoft Graph v1.0 extension reference) |
+| `bicepconfig.json` | Bicep configuration |
 | `main.parameters.json` | Parameter values (environment name, location) |
 | `abbreviations.json` | Azure resource naming abbreviations |
 
 ## Key Features
 
 - **Subscription Scope**: Single deployment creates resource group + all resources
-- **Parallel Provisioning**: ARM auto-parallelizes independent modules — `infrastructure` and `entraApp` deploy simultaneously when `enableObo=false`. With OBO enabled, `entraApp` waits for `infrastructure` (needs MI principal ID for FIC).
+- **Parallel Provisioning**: ARM auto-parallelizes independent modules
 - **Unique Naming**: `uniqueString()` prevents naming conflicts
 - **Scale-to-Zero**: Container App scales down when idle (cost savings)
-- **Managed Identity**: User-assigned MI with `isolationScope: Regional` for ACR pull + AI Foundry + OBO
+- **Managed Identity**: User-assigned MI with `isolationScope: Regional` for ACR pull + AI Foundry
 - **RBAC Automation**: Auto-assigns `Cognitive Services User` + `Cognitive Services OpenAI Contributor` + `Azure AI Developer` roles to AI Foundry
 
 ## Deployment
@@ -105,11 +97,10 @@ az deployment sub create \
 | `environmentName` | (required) | Unique identifier (appended to resource names) |
 | `location` | (required) | Azure region |
 | `webImageName` | `mcr.microsoft.com/k8se/quickstart:latest` | Container image (placeholder during initial provision) |
-| `serviceManagementReference` | (empty) | Service Management Reference GUID (required by some orgs for Entra app registration) |
-| `entraTenantId` | `tenant().tenantId` | Entra tenant ID (auto-detected or from azd) |
+| `googleClientId` | (required, from azd) | Google OAuth 2.0 Client ID (set via `azd env set GOOGLE_CLIENT_ID <id>`) |
+| `googleHostedDomain` | `3styk.com` | Google Workspace domain allowed to sign in, enforced via the ID token `hd` claim |
 | `aiAgentEndpoint` | (from azd) | AI Agent endpoint URL |
 | `aiAgentId` | (from azd) | Agent name |
-| `enableObo` | `false` | Enable OBO backend app + FIC + admin consent (backend app in Bicep; FIC + admin consent in postprovision.ps1) |
 
 ## Outputs
 
@@ -120,10 +111,6 @@ az deployment sub create \
 | `AZURE_RESOURCE_GROUP_NAME` | Resource group name |
 | `WEB_ENDPOINT` | Application FQDN with https:// |
 | `WEB_IDENTITY_PRINCIPAL_ID` | Managed identity principal ID (for RBAC via CLI) |
-| `ENTRA_SPA_CLIENT_ID` | Entra app client ID (generated by Bicep) |
-| `ENTRA_APP_OBJECT_ID` | Entra app object ID (for postprovision updates) |
-| `ENTRA_BACKEND_CLIENT_ID` | Backend app client ID (empty when OBO disabled) |
-| `ENTRA_BACKEND_APP_OBJECT_ID` | Backend app object ID (empty when OBO disabled) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Backend App Insights connection string |
 | `APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING` | Frontend App Insights connection string (passed as Docker build arg) |
 
@@ -134,7 +121,7 @@ az deployment sub create \
 - **Compute**: 0.5 vCPU, 1GB RAM (parameterized — override via `cpu` and `memory` params in `core/host/container-app.bicep`)
 - **Scaling**: 0-3 replicas (parameterized — override via `minReplicas` and `maxReplicas` params in `core/host/container-app.bicep`)
 - **Ingress**: External HTTPS on port 8080
-- **Identity**: User-assigned MI only (ACR pull, AI Foundry RBAC, OBO FIC)
+- **Identity**: User-assigned MI only (ACR pull, AI Foundry RBAC)
 - **ACR Pull**: Managed identity with `acrPull` role assignment (no admin credentials)
 - **Health Probes**:
   - **Liveness**: `GET /api/health` every 30s (failureThreshold: 3)

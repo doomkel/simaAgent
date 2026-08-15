@@ -174,11 +174,11 @@ function AssistantMessageComponent({
   return (
     <CopilotMessage
       id={`msg-${message.id}`}
-      avatar={<AgentIcon logoUrl={agentLogo} />}
-      name={agentName}
+      avatar={<AgentIcon logoUrl={agentLogo} size="small" />}
+      name="Sima AI"
       loadingState="none"
       className={styles.copilotMessage}
-      disclaimer={<span>AI-generated content may be incorrect</span>}
+      disclaimer={<span></span>}
       footnote={
         <div className={styles.footnoteContainer}>
           {hasAnnotations && !isStreaming && (

@@ -23,6 +23,7 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
         auth: {
           status: 'authenticated',
           user: action.user,
+          token: action.token,
           error: null,
         },
       };
@@ -33,6 +34,17 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
         auth: {
           ...state.auth,
           status: 'unauthenticated',
+        },
+      };
+
+    case 'AUTH_SIGN_OUT':
+      return {
+        ...state,
+        auth: {
+          status: 'unauthenticated',
+          user: null,
+          token: null,
+          error: null,
         },
       };
 

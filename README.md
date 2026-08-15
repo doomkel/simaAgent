@@ -1,8 +1,8 @@
 # AI Agent Web App
 
-AI-powered web application with Entra ID authentication and Foundry Agent Service integration. Deploy to Azure Container Apps with a single command.
+AI-powered web application with Google OAuth authentication and Foundry Agent Service integration. Deploy to Azure Container Apps with a single command.
 
-> **⚠️ Coming from the AI Foundry portal?** The portal's "View sample app code" gives you AI resource variables, but this app also needs an **Entra ID app registration** for authentication — which is created by `azd up`. Even if your AI Foundry resources already exist, you must run `azd up` before the app will work. See the [Foundry portal setup](#coming-from-the-ai-foundry-portal) section below.
+> **⚠️ Coming from the AI Foundry portal?** The portal's "View sample app code" gives you AI resource variables, but this app also needs a **Google OAuth Client ID** for authentication — set via `azd env set GOOGLE_CLIENT_ID <client-id>` before running `azd up`. See the [Foundry portal setup](#coming-from-the-ai-foundry-portal) section below.
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ azd up
 
 The `azd up` command:
 1. Discovers AI Foundry resources in your subscription
-2. Creates Microsoft Entra ID app registration (via Bicep) and Azure infrastructure (ACR, Container Apps)
+2. Deploys Azure infrastructure (ACR, Container Apps) via Bicep
 3. Builds and deploys your application
 4. Opens browser to your deployed app
 
@@ -34,7 +34,7 @@ The `azd up` command:
 
 ### GitHub Codespaces
 
-This repo includes a devcontainer configuration for Codespaces. The `azd` CLI, .NET 10 SDK, Node.js, and PowerShell are pre-installed. Open in Codespaces, then run `azd up` from the terminal to provision the Entra app and generate `.env` files.
+This repo includes a devcontainer configuration for Codespaces. The `azd` CLI, .NET 10 SDK, Node.js, and PowerShell are pre-installed. Open in Codespaces, then run `azd up` from the terminal to provision infrastructure and generate `.env` files.
 
 > **Corporate tenants**: Codespaces VMs are not managed by Intune, so organizations with device-compliance Conditional Access policies may block `az login` or token acquisition. The `az login --use-device-code` flow authenticates on your compliant browser, but some policies evaluate the device at token-use time — not just at login. If you hit authentication errors in Codespaces, use local development instead.
 
@@ -86,13 +86,13 @@ registry=https://your-registry.example.com/
 
 ### Organization-Specific Requirements
 
-If your organization requires a Service Management Reference for Entra ID app registrations:
+Google OAuth requires an OAuth 2.0 Client ID (Web application) created at [Google Cloud Console](https://console.cloud.google.com/apis/credentials), with this app's URL registered as an authorized JavaScript origin:
 
 ```powershell
-azd env set ENTRA_SERVICE_MANAGEMENT_REFERENCE "<guid-from-admin>"
+azd env set GOOGLE_CLIENT_ID "<client-id-from-google-cloud-console>"
 ```
 
-See [deployment/hooks/README.md](deployment/hooks/README.md#app-registration-policies) for more organization-specific configuration options.
+See [deployment/hooks/README.md](deployment/hooks/README.md#google-oauth-setup) for details.
 
 ## VS Code Configuration
 
@@ -147,12 +147,12 @@ The workspace includes optimized VS Code configuration for AI-assisted developme
 
 ### Coming from the AI Foundry Portal
 
-The portal's "View sample app code" dialog provides AI resource variables (`AI_AGENT_ENDPOINT`, `AI_AGENT_ID`, etc.), which tell the app *which agent to talk to*. However, this app also requires an **Entra ID app registration** for user authentication — which the portal does not create. Running `azd up` creates it, along with the `.env` files that wire everything together.
+The portal's "View sample app code" dialog provides AI resource variables (`AI_AGENT_ENDPOINT`, `AI_AGENT_ID`, etc.), which tell the app *which agent to talk to*. However, this app also requires a **Google OAuth Client ID** for user authentication — which the portal does not create.
 
 **What the portal gives you**: AI Foundry project endpoint and agent ID — these identify your agent.
-**What `azd up` adds**: Entra app registration, JWT auth config, redirect URIs, RBAC grants, Azure infrastructure.
+**What you add**: `azd env set GOOGLE_CLIENT_ID <client-id>` (from Google Cloud Console), then `azd up` generates the `.env` files that wire everything together.
 
-Without `azd up`, the frontend shows `undefined` in the login URL because `VITE_ENTRA_SPA_CLIENT_ID` and `VITE_ENTRA_TENANT_ID` don't exist yet.
+Without a configured Client ID, the frontend shows a sign-in error because `VITE_GOOGLE_CLIENT_ID` doesn't exist yet.
 
 If you clicked "View sample app code" in the portal, you can either paste the portal variables into a root `.env` file or set them via `azd env set`, then run `azd up`:
 
@@ -248,7 +248,7 @@ Multiple layers catch incomplete setup before cryptic errors appear:
 
 | Layer | What It Checks | When It Runs |
 |-------|---------------|--------------|
-| **Vite env check plugin** | `VITE_ENTRA_SPA_CLIENT_ID`, `VITE_ENTRA_TENANT_ID` | Dev server startup (`npm run dev`) — serves a styled error page instead of the app |
+| **Vite env check plugin** | `VITE_GOOGLE_CLIENT_ID` | Dev server startup (`npm run dev`) — serves a styled error page instead of the app |
 | **preToolUse hook** | Context-aware: frontend commands check frontend env, backend commands check backend env (including `AI_AGENT_ENDPOINT`, `AI_AGENT_ID`) | AI agents running dev commands — advisory message, non-blocking |
 | **Validate Configuration task** | Both `.env` files with auth variables | On-demand via VS Code (`Tasks: Run Task` → `Validate Configuration`) |
 | **`validating-local-setup` skill** | Full diagnostic checklist with error patterns and step-by-step fixes | Loaded by AI agents when setup issues are detected |
@@ -259,7 +259,7 @@ All layers point to the same fix: run `azd up` from the repo root.
 
 **Frontend**: React 19 + TypeScript + Vite  
 **Backend**: ASP.NET Core 9 Minimal APIs  
-**Authentication**: Microsoft Entra ID (PKCE flow)  
+**Authentication**: Google OAuth 2.0 (Google Identity Services)  
 **AI Integration**: Foundry Agent Service v2 Agents API (`Azure.AI.Projects` SDK)  
 **Deployment**: Single container, Azure Container Apps  
 **Local Dev**: Native (no Docker required)
@@ -304,7 +304,7 @@ This repository uses VS Code's Agent Skills feature for on-demand context loadin
   - `writing-typescript-code` - TypeScript/React patterns
   - `writing-bicep-templates` - Bicep infrastructure patterns
   - `implementing-chat-streaming` - SSE streaming patterns
-  - `troubleshooting-authentication` - MSAL/JWT debugging
+  - `troubleshooting-authentication` - Google OAuth/JWT debugging
   - `researching-azure-ai-sdk` - SDK research workflow
   - `testing-with-playwright` - Browser testing workflow
   - `syncing-mcp-servers` - MCP server config synchronization
@@ -328,7 +328,7 @@ This template deploys the following Azure resources:
 - **Log Analytics Workspace** - Centralized logging (30-day retention)
 - **Application Insights (Backend)** - OpenTelemetry traces, metrics, and distributed tracing (`APPLICATIONINSIGHTS_CONNECTION_STRING` env var)
 - **Application Insights (Frontend)** - Browser telemetry via `@microsoft/applicationinsights-web` (separate resource to isolate browser metrics from server metrics)
-- **User-Assigned Managed Identity** - `isolationScope: Regional` — used for ACR pull, AI Foundry RBAC, and OBO FIC. No admin credentials or secrets.
+- **User-Assigned Managed Identity** - `isolationScope: Regional` — used for ACR pull and AI Foundry RBAC. No admin credentials or secrets.
 
 All resources deploy to the same region (`AZURE_LOCATION`). The managed identity's regional isolation ensures it can only be assigned to compute resources in the deployment region.
 
@@ -336,91 +336,20 @@ All resources deploy to the same region (`AZURE_LOCATION`). The managed identity
 
 ## Authentication & Identity
 
-### Default: Managed Identity (Zero-Touch)
+### Sign-in: Google OAuth (Zero-Touch)
 
 By default, `azd up` configures everything automatically:
 
 | Component | Identity | How |
 |-----------|----------|-----|
-| Frontend → Backend | User's Entra ID token (MSAL.js PKCE) | SPA app registration created by Bicep |
+| Frontend → Backend | Google-issued ID token (Google Identity Services) | Backend validates signature via Google's OIDC discovery/JWKS, audience, and `hd` Workspace domain claim |
 | Backend → Agent Service | Container App's managed identity | User-assigned MI + RBAC (see [Azure Resources](#azure-resources-provisioned)) |
 
-The managed identity has `Cognitive Services OpenAI Contributor` + `Azure AI Developer` roles on the AI Foundry resource. All agent tool calls (MCP, OpenAPI, Logic Apps) use the **agent's own identity** configured in the Foundry portal — NOT the web app's identity and NOT the user's identity.
+The managed identity has `Cognitive Services OpenAI Contributor` + `Azure AI Developer` roles on the AI Foundry resource. All agent tool calls (MCP, OpenAPI, Logic Apps) use the **agent's own identity** configured in the Foundry portal — NOT the web app's identity and NOT the user's identity. A Google ID token cannot be exchanged for an Azure token, so there is no per-user delegation to Foundry; all users share the managed identity's permissions.
 
 **Scope requested by `AIProjectClient`**: `https://ai.azure.com/.default`
 
-### Advanced: On-Behalf-Of (OBO) — Opt-In
-
-OBO replaces the managed identity with the **user's own identity** for Agent Service API calls. This gives you per-user audit trails and rate limiting but adds enterprise friction.
-
-> **⚠️ Important**: OBO does NOT pass the user's identity to agent tools. Tool authentication (MCP servers, OpenAPI endpoints, Logic Apps) is controlled by the [Agent Identity](https://learn.microsoft.com/azure/ai-foundry/agents/concepts/agent-identity) configured in the Foundry portal. OBO only affects who the Agent Service API sees as the caller.
-
-#### How OBO Works (Secretless via Federated Identity Credential)
-
-```text
-┌──────────┐  JWT (user)  ┌──────────────┐  OBO token (user)  ┌──────────────┐
-│ Frontend │ ────────────►│ Backend API  │ ──────────────────►│ Agent Service│
-│ (MSAL.js)│              │ (ASP.NET)    │                     │ (Foundry)    │
-└──────────┘              └──────────────┘                     └──────────────┘
-                                │
-                                │ 1. ManagedIdentityClientAssertion
-                                │    → gets MI token (audience: api://AzureADTokenExchange)
-                                │
-                                │ 2. OnBehalfOfCredential(tenantId, backendClientId,
-                                │      miAssertionCallback, userJWT)
-                                │    → exchanges user JWT for OBO token
-                                │    → scope: https://ai.azure.com/.default
-                                │
-                                │ No secrets! MI token replaces client secret.
-```
-
-**References**:
-- [OBO flow protocol](https://learn.microsoft.com/entra/identity-platform/v2-oauth2-on-behalf-of-flow)
-- [Federated Identity Credentials (FIC) with managed identities](https://learn.microsoft.com/entra/workload-id/workload-identity-federation-config-app-trust-managed-identity)
-- [ManagedIdentityClientAssertion](https://learn.microsoft.com/entra/msal/dotnet/acquiring-tokens/web-apps-apis/workload-identity-federation)
-- [Agent Identity in Foundry](https://learn.microsoft.com/azure/ai-foundry/agents/concepts/agent-identity)
-
-#### Enable OBO
-
-```powershell
-azd env set ENABLE_OBO true
-azd up
-```
-
-This creates a backend API app registration with FIC, sets `api://{backendClientId}` identifier URI, and attempts admin consent. If consent fails, follow the printed instructions.
-
-#### RBAC & Consent Requirements
-
-| Requirement | Who | What | Why |
-|-------------|-----|------|-----|
-| **FIC creation** | Deployer | `Application Administrator` role in Entra ID | To create the federated identity credential on the backend app |
-| **Admin consent** | Entra admin | Grant **Azure Machine Learning Services / `user_impersonation`** delegated permission | The OBO token exchange requests `https://ai.azure.com/.default` which resolves to Azure Machine Learning Services (appId: `18a66f5f-dbdf-4c17-9dd7-1634712a9cbe`). Without admin consent, token acquisition fails with `AADSTS65001`. |
-| **User RBAC** | Each user | `Azure AI User` role on the Foundry resource | OBO tokens carry the user's identity; the user needs data-plane permissions ([docs](https://learn.microsoft.com/azure/ai-foundry/concepts/rbac-foundry)) |
-| **Known client** | Deployer (optional) | Add SPA client ID to backend app's `knownClientApplications` | Enables combined consent prompt so users consent to both SPA + backend in one step ([docs](https://learn.microsoft.com/entra/identity-platform/v2-oauth2-on-behalf-of-flow#default-and-combined-consent)) |
-
-> **⚠️ Common mistake: consenting to the wrong service.** The Azure portal shows "Microsoft Cognitive Services" (`https://cognitiveservices.azure.com`, appId: `7d312290-...`) which looks like the right choice — but `AIProjectClient` actually requests tokens for `https://ai.azure.com/.default` which maps to **Azure Machine Learning Services** (appId: `18a66f5f-dbdf-4c17-9dd7-1634712a9cbe`). These are **different first-party service principals**. You must consent to the correct one:
->
-> ```bash
-> # Add the CORRECT permission (Azure Machine Learning Services, not Cognitive Services)
-> az ad app permission add \
->   --id <your-backend-app-id> \
->   --api 18a66f5f-dbdf-4c17-9dd7-1634712a9cbe \
->   --api-permissions 1a7925b5-f871-417a-9b8b-303f9f29fa10=Scope
->
-> # Then grant admin consent
-> az ad app permission admin-consent --id <your-backend-app-id>
-> ```
->
-> Or in the portal: API permissions → Add → "APIs my organization uses" → search **"Azure Machine Learning"** → `user_impersonation` (Delegated).
-
-#### OBO Gotchas
-
-| Gotcha | Detail |
-|--------|--------|
-| **Wrong consent target** | Portal shows "Microsoft Cognitive Services" (`cognitiveservices.azure.com`, appId `7d312290-...`) — this is NOT correct. `AIProjectClient` uses `ai.azure.com/.default` → **Azure Machine Learning Services** (appId `18a66f5f-...`). Consenting to wrong one gives green checkmark but runtime `AADSTS65001`. |
-| **Tool identity is separate** | OBO only affects the Agent Service API caller. Agent tools (MCP, OpenAPI, Logic Apps) use the agent's identity from Foundry portal. Configure [Agent Identity](https://learn.microsoft.com/azure/ai-foundry/agents/concepts/agent-identity) separately for per-user tool access. |
-| **Conversations not user-scoped in MI mode** | MI uses a shared identity — all users see all conversations. OBO provides per-user isolation. |
-| **Local dev uses CLI credentials** | OBO requires a managed identity for FIC. Locally, the app uses `az login` credentials regardless of `ENTRA_BACKEND_CLIENT_ID`. |
+**Domain restriction**: Only accounts in the `GOOGLE_HOSTED_DOMAIN` Workspace (default `3styk.com`) can sign in, enforced server-side via the ID token's `hd` claim.
 
 ## Project Structure
 

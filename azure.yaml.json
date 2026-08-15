@@ -1,6 +1,6 @@
 {
   "name": "ai-foundry-agent",
-  "description": "Secure AI-powered web application with .NET, React, and Foundry Agent Service. Features Entra ID authentication with PKCE, managed identity, and automated deployment to Azure Container Apps.",
+  "description": "Secure AI-powered web application with .NET, React, and Foundry Agent Service. Features Google OAuth 2.0 authentication, managed identity, and automated deployment to Azure Container Apps.",
   "author": "Microsoft",
   "repositoryPath": ".",
   "tags": [
@@ -9,8 +9,7 @@
     "dotnet",
     "typescript",
     "azure-container-apps",
-    "entra-id",
-    "pkce",
+    "google-oauth",
     "managed-identity",
     "bicep",
     "azd"

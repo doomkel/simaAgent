@@ -21,7 +21,7 @@ Write-Host "[OK] Prerequisites: dotnet $(dotnet --version), node $(node -v)" -Fo
 # Install frontend deps if missing
 $frontendPath = Join-Path $projectRoot "frontend"
 $nodeModules = Join-Path $frontendPath "node_modules"
-if (-not (Test-Path (Join-Path $nodeModules "@azure/msal-react"))) {
+if (-not (Test-Path (Join-Path $nodeModules "react"))) {
     Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
     Push-Location $frontendPath
     npm install

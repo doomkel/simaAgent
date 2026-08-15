@@ -14,8 +14,6 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@azure/msal-browser": "^4.27.0",
-    "@azure/msal-react": "^3.0.23",
     "@fluentui-copilot/react-copilot": "0.30.5",
     "@fluentui-copilot/react-copilot-chat": "0.13.2",
     "@fluentui/react-components": "^9.73.7",

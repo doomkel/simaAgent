@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Post-down: Cleanup Entra app, role assignments, and local config after azd down
+# Post-down: Cleanup role assignments and local config after azd down
 
 $ErrorActionPreference = "Continue"
 . "$PSScriptRoot/modules/HookLogging.ps1"
@@ -28,26 +28,6 @@ if ($webIdentityPrincipalId -and $aiFoundryResourceGroup -and $aiFoundryResource
             --scope $scope 2>&1 | Out-Null
         
         Write-Host "[OK] $roleName — removed (if it existed)" -ForegroundColor Green
-    }
-}
-
-# Delete Entra app (Graph resources are NOT tied to Azure resource groups — azd down won't clean them up)
-if ($envName) {
-    $clientId = (azd env get-value ENTRA_SPA_CLIENT_ID 2>&1) | Where-Object { $_ -notmatch 'ERROR' } | Select-Object -First 1
-    $deleted = $false
-    if (-not [string]::IsNullOrWhiteSpace($clientId)) {
-        az ad app delete --id $clientId 2>&1 | Out-Null
-        Write-Host "[OK] Entra app deleted: $clientId" -ForegroundColor Green
-        $deleted = $true
-    }
-    if (-not $deleted) {
-        # Fallback: look up by display name (matches Bicep uniqueName pattern)
-        $appName = "ai-foundry-agent-$envName"
-        $app = az ad app list --display-name $appName --query "[0].appId" -o tsv 2>$null
-        if ($app) {
-            az ad app delete --id $app 2>&1 | Out-Null
-            Write-Host "[OK] Entra app deleted (by name): $appName" -ForegroundColor Green
-        }
     }
 }
 

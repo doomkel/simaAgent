@@ -19,18 +19,21 @@ All hooks start a PowerShell transcript automatically and write logs to `.azure/
 
 | Hook | Purpose | Key Actions | Outputs |
 |------|---------|-------------|---------|
-| **preprovision.ps1** | Discover AI Foundry + configure agent | • Discovers AI Foundry resources<br>• Auto-detects tenant ID<br>• Discovers agent in project | AI Foundry env vars |
-| **postprovision.ps1** | Configure Entra app + RBAC + local config | • Sets `identifierUri` on Entra app (can't be done in Bicep — self-references `appId`)<br>• Updates redirect URIs with production URL<br>• Assigns `Cognitive Services OpenAI Contributor` + `Azure AI Developer` roles to AI Foundry<br>• Generates local dev config files (`.env`, `.env.local`) | Configured Entra app + RBAC + local config |
-| **predeploy.ps1** | Build container image | • Detects Docker availability<br>• Passes `APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING` as Docker build arg for frontend browser telemetry<br>• Local Docker build + push OR ACR cloud build<br>• Updates Container App if it exists | Container image in ACR |
-| **postdown.ps1** | Cleanup (optional) | • Removes RBAC assignment<br>• Deletes Entra app (Graph resources aren't tied to RGs)<br>• Optionally removes Docker images | Clean slate |
+| **preprovision.ps1** | Discover AI Foundry + configure agent | • Discovers AI Foundry resources<br>• Validates `GOOGLE_CLIENT_ID` is set<br>• Discovers agent in project | AI Foundry env vars |
+| **postprovision.ps1** | RBAC + local config | • Assigns `Cognitive Services OpenAI Contributor` + `Azure AI Developer` roles to AI Foundry<br>• Generates local dev config files (`.env`, `.env.local`) with Google OAuth vars | RBAC + local config |
+| **predeploy.ps1** | Build container image | • Detects Docker availability<br>• Passes `GOOGLE_CLIENT_ID`, `GOOGLE_HOSTED_DOMAIN`, `APPLICATIONINSIGHTS_FRONTEND_CONNECTION_STRING` as Docker build args<br>• Local Docker build + push OR ACR cloud build<br>• Updates Container App if it exists | Container image in ACR |
+| **postdown.ps1** | Cleanup (optional) | • Removes RBAC assignment<br>• Optionally removes Docker images | Clean slate |
 
-## Entra App Registration
+## Google OAuth Setup
 
-The Entra app is created **declaratively via Bicep** (`infra/entra-app.bicep`) using the Microsoft Graph Bicep extension.
+Unlike Entra ID, the Google OAuth Client ID **cannot be created by Bicep** — it belongs to a Google Cloud project, not Azure. Before running `azd up`:
 
-**What Bicep handles**: App creation, display name, sign-in audience, SPA redirect URIs (localhost only), `Chat.ReadWrite` scope, service principal, and `serviceManagementReference`.
+1. Create an OAuth 2.0 Client ID (Web application) at [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Add `http://localhost:5173` as an authorized JavaScript origin for local dev.
+3. Run `azd env set GOOGLE_CLIENT_ID <client-id>`.
+4. After `azd up` completes, add the printed `WEB_ENDPOINT` URL as an additional authorized JavaScript origin.
 
-**What postprovision handles**: `identifierUri` (requires auto-generated `appId`), Container App FQDN redirect URI, and local dev config generation.
+The backend enforces the `3styk.com` Workspace domain via the `hd` claim on the Google ID token (override with `azd env set GOOGLE_HOSTED_DOMAIN <domain>`).
 
 ## Module Scripts
 
@@ -71,30 +74,13 @@ azd up
 
 | Issue | Fix |
 |-------|-----|
-| App registration fails with policy error | Run `azd env set ENTRA_SERVICE_MANAGEMENT_REFERENCE 'guid'` then `azd up` (Bicep passes it to Microsoft Graph extension) |
+| Preprovision fails: `GOOGLE_CLIENT_ID not set` | Run `azd env set GOOGLE_CLIENT_ID <client-id>` (see Google OAuth Setup above) |
 | Provision fails | Verify Azure CLI auth: `az account show` |
 | Predeploy Docker build fails | Check Docker running: `docker version` (falls back to ACR cloud build) |
 | AI Foundry not found | Create resource at [ai.azure.com](https://ai.azure.com) or use [foundry-samples Bicep templates](https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep) |
 | Multiple AI Foundry resources | Set `AI_FOUNDRY_RESOURCE_NAME` or select when prompted |
 | RBAC assignment fails | Verify you have User Access Administrator role on AI Foundry resource |
-
-### App Registration Policies
-
-Some organizations require [`serviceManagementReference`](https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.applications/invoke-mginstantiateapplicationtemplate) for app registrations.
-
-**Quick fix**:
-```powershell
-azd env set ENTRA_SERVICE_MANAGEMENT_REFERENCE 'your-guid-here'
-azd up
-```
-
-**Persistent fix** (environment variable):
-```powershell
-[System.Environment]::SetEnvironmentVariable('ENTRA_SERVICE_MANAGEMENT_REFERENCE', 'your-guid-here', 'User')
-# Restart terminal
-```
-
-Contact your Entra ID admin for the required GUID.
+| Sign-in fails with `redirect_uri_mismatch` or origin error | Add the app's URL as an authorized JavaScript origin for the Client ID in Google Cloud Console |
 
 ### Multiple AI Foundry Resources
 
@@ -112,7 +98,7 @@ azd env set AI_FOUNDRY_RESOURCE_NAME "your-ai-foundry-resource-name"
 | Change | File | Modification |
 |--------|------|-------------|
 | Always clean Docker images | `postdown.ps1` | Set `$cleanDockerImages = $true` |
-| Change ports | `start-local-dev.ps1` + Entra app URIs | Update port references |
+| Change ports | `start-local-dev.ps1` + Google Cloud Console authorized origins | Update port references |
 | Skip auto-opening browser | `postprovision.ps1` | Comment out `Start-Process` line |
 
 ## See Also

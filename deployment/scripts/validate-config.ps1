@@ -22,8 +22,7 @@ Write-Host "Frontend config:" -ForegroundColor Cyan
 $frontendEnv = Join-Path $projectRoot "frontend/.env.local"
 if (Test-Path $frontendEnv) {
     $content = Get-Content $frontendEnv -Raw
-    if (-not (Test-EnvVar $content "VITE_ENTRA_SPA_CLIENT_ID" "frontend/.env.local")) { $null = $validationErrors.Add("VITE_ENTRA_SPA_CLIENT_ID") }
-    if (-not (Test-EnvVar $content "VITE_ENTRA_TENANT_ID" "frontend/.env.local")) { $null = $validationErrors.Add("VITE_ENTRA_TENANT_ID") }
+    if (-not (Test-EnvVar $content "VITE_GOOGLE_CLIENT_ID" "frontend/.env.local")) { $null = $validationErrors.Add("VITE_GOOGLE_CLIENT_ID") }
 } else {
     $null = $validationErrors.Add("frontend/.env.local not found")
     Write-Host "  [ERROR] File not found" -ForegroundColor Red
@@ -34,8 +33,7 @@ Write-Host "Backend config:" -ForegroundColor Cyan
 $backendEnv = Join-Path $projectRoot "backend/WebApp.Api/.env"
 if (Test-Path $backendEnv) {
     $content = Get-Content $backendEnv -Raw
-    if (-not (Test-EnvVar $content "AzureAd__TenantId" "backend/.env")) { $null = $validationErrors.Add("AzureAd__TenantId") }
-    if (-not (Test-EnvVar $content "AzureAd__ClientId" "backend/.env")) { $null = $validationErrors.Add("AzureAd__ClientId") }
+    if (-not (Test-EnvVar $content "GOOGLE_CLIENT_ID" "backend/.env")) { $null = $validationErrors.Add("GOOGLE_CLIENT_ID") }
 } else {
     $null = $validationErrors.Add("backend/.env not found")
     Write-Host "  [ERROR] File not found" -ForegroundColor Red

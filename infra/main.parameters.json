@@ -8,11 +8,11 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "entraTenantId": {
-      "value": "${ENTRA_TENANT_ID}"
+    "googleClientId": {
+      "value": "${GOOGLE_CLIENT_ID}"
     },
-    "serviceManagementReference": {
-      "value": "${ENTRA_SERVICE_MANAGEMENT_REFERENCE=}"
+    "googleHostedDomain": {
+      "value": "${GOOGLE_HOSTED_DOMAIN=3styk.com}"
     },
     "webImageName": {
       "value": "${SERVICE_WEB_IMAGE_NAME=}"

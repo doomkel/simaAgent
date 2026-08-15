@@ -1,6 +1,6 @@
 import React from 'react';
 import { Caption1Strong } from '@fluentui/react-components';
-import { AIFoundryLogo } from '../icons/AIFoundryLogo';
+import { SimaPisysLogo } from '../icons/AIFoundryLogo';
 import styles from './BuiltWithBadge.module.css';
 
 interface BuiltWithBadgeProps {
@@ -22,13 +22,10 @@ export const BuiltWithBadge: React.FC<BuiltWithBadgeProps> = ({ className }) => 
       aria-label="Built with Microsoft Foundry"
     >
       <span className={styles.logo}>
-        <AIFoundryLogo />
+        <SimaPisysLogo />
       </span>
-      <Caption1Strong className={styles.text}>
-        Build & deploy AI agents with
-      </Caption1Strong>
       <Caption1Strong className={styles.brand}>
-        Microsoft Foundry
+        SIMA AI
       </Caption1Strong>
     </button>
   );

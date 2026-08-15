@@ -3,13 +3,6 @@ import { ChatService } from '../chatService';
 import type { AppAction } from '../../types/appState';
 import type { Dispatch } from 'react';
 
-// Mock the auth module
-vi.mock('../../config/authConfig', () => ({
-  msalConfig: { auth: { clientId: 'test', authority: 'https://login.microsoftonline.com/test' } },
-  loginRequest: { scopes: ['api://test/Chat.ReadWrite'] },
-  tokenRequest: { scopes: ['api://test/Chat.ReadWrite'], forceRefresh: false },
-}));
-
 describe('ChatService', () => {
   let chatService: ChatService;
   let mockDispatch: Dispatch<AppAction>;

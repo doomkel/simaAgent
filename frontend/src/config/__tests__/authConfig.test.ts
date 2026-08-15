@@ -5,19 +5,17 @@ describe('authConfig', () => {
     vi.resetModules();
   });
 
-  it('uses SPA client ID for scopes when backend client ID not set', async () => {
-    vi.stubEnv('VITE_ENTRA_SPA_CLIENT_ID', 'spa-client-id');
-    vi.stubEnv('VITE_ENTRA_TENANT_ID', 'tenant-id');
-    vi.stubEnv('VITE_ENTRA_BACKEND_CLIENT_ID', '');
-    const { loginRequest } = await import('../../config/authConfig');
-    expect(loginRequest.scopes[0]).toBe('api://spa-client-id/Chat.ReadWrite');
+  it('exposes the configured Google client ID', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+    vi.stubEnv('VITE_GOOGLE_HOSTED_DOMAIN', '3styk.com');
+    const { GOOGLE_CLIENT_ID } = await import('../../config/authConfig');
+    expect(GOOGLE_CLIENT_ID).toBe('test-client-id');
   });
 
-  it('uses backend client ID for scopes when set', async () => {
-    vi.stubEnv('VITE_ENTRA_SPA_CLIENT_ID', 'spa-client-id');
-    vi.stubEnv('VITE_ENTRA_TENANT_ID', 'tenant-id');
-    vi.stubEnv('VITE_ENTRA_BACKEND_CLIENT_ID', 'backend-client-id');
-    const { loginRequest } = await import('../../config/authConfig');
-    expect(loginRequest.scopes[0]).toBe('api://backend-client-id/Chat.ReadWrite');
+  it('defaults the hosted domain to 3styk.com when unset', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+    vi.stubEnv('VITE_GOOGLE_HOSTED_DOMAIN', '');
+    const { GOOGLE_HOSTED_DOMAIN } = await import('../../config/authConfig');
+    expect(GOOGLE_HOSTED_DOMAIN).toBe('3styk.com');
   });
 });
