@@ -28,6 +28,7 @@ const brandColors: BrandVariants = {
 
 export const lightTheme: Theme = {
   ...createLightTheme(brandColors),
+  colorNeutralBackground1: "#EBF5FF", 
 };
 
 export const darkTheme: Theme = {

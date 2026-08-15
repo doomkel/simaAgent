@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 
+import logoSrc from "./logo-mini.png";
+
 interface AIFoundryLogoProps {
+  width?: number | string;
+  height?: number | string;
+  className?: string;
+}
+
+interface SimaPisysLogoProps {
   width?: number | string;
   height?: number | string;
   className?: string;
@@ -28,5 +36,23 @@ export function AIFoundryLogo({
         fillRule="evenodd"
       />
     </svg>
+  );
+  
+}
+
+export function SimaPisysLogo({
+  width = 24, 
+  height = 24, 
+  className,
+}: SimaPisysLogoProps): ReactNode {
+  return (
+    <img
+      src={logoSrc}
+      alt="Logo de SIMA PISYS"
+      width={width}
+      height={height}
+      className={className}
+      style={{ objectFit: 'contain' }} // Opcional: para asegurar que el logo se vea bien
+    />
   );
 }

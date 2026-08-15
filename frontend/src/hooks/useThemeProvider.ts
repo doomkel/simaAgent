@@ -78,7 +78,7 @@ export const useThemeProvider = (): ThemeContextValue => {
         return storedTheme;
       }
     }
-    return 'System';
+    return 'Light';
   });
 
   // Memoize computed values
