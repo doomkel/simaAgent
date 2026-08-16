@@ -36,7 +36,7 @@ interface AssistantMessageProps {
 
 function AssistantMessageComponent({ 
   message, 
-  agentName = 'AI Assistant',
+  agentName = 'Sima AI',
   agentLogo,
   isStreaming = false,
   onRegenerate,
@@ -175,7 +175,7 @@ function AssistantMessageComponent({
     <CopilotMessage
       id={`msg-${message.id}`}
       avatar={<AgentIcon logoUrl={agentLogo} size="small" />}
-      name="Sima AI"
+      name={agentName}
       loadingState="none"
       className={styles.copilotMessage}
       disclaimer={<span></span>}

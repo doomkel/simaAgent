@@ -192,7 +192,7 @@ npm ci  # Fails if lock file is out of sync with package.json
 
 **Parser**: `frontend/src/utils/citationParser.ts`
 
-Handles Azure AI Agent citation formats:
+Handles Sima AI Agent citation formats:
 - Assistants/Responses API: `【4:0†source】`, `【13†myfile.pdf】`
 - Azure OpenAI On Your Data: `[doc1]`, `[doc2]`
 
